@@ -1,0 +1,7 @@
+This bot collects Iranian hosted website, services, or applications domains, and publishes the list online for public access. You can help fighting internet restrictions by sending domain name, link, or URL of Iranian services to this bot.
+No information linked to your account will be stored, and it's completely anonymous.
+Send /help for how to use this bot.
+
+این ربات دامنه های وبسایت‌ها، سرویس‌ها و اپلیکشن‌های ایرانی را جمع آوری میکند و به صورت باز در دسترس عموم قرار می‌دهد. شما می‌توانید با ارسال یک لینک یا نام دامنه به این ربات، به مبارزه علیه محدودیت‌های اینترنت کمک کنید.
+هیچ اطلاعاتی راجع به حساب کاربری شما نگهداری نمی‌شود و حساب کاربری شما به طور کامل ناشناس باقی خواهد ماند.
+دستور /help را دریافت راهنمایی چگونگی استفاده از ربات ارسال کنید.

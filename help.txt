@@ -1,0 +1,3 @@
+Usage is very simple; just send a domain name (e.g., `git.ir`), or a link (e.g., `https://maktabkhooneh.org/course`) to this bot. You should get the domain name back upon successful processing, otherwise make sure you're sending a correct valid URL/domain.
+
+استفاده از این ربات ساده است. فقط لازم است یک نام دامنه (مثلا `git.ir`) یا یک لینک (مثلا `https://maktabkhooneh.org/course`) را به ربات ارسال کنید. در صورت عدم دریافت پاسخ از سمت ربات مطمئن شوید لینک یا نام دامنه را به درستی ارسال کردید.
