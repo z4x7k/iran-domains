@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
+	_ "modernc.org/sqlite"
 )
 
 const (
@@ -78,10 +80,28 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 
 		if err := godotenv.Load(); nil != err {
 			if !errors.Is(err, os.ErrNotExist) {
-				log.Fatal().Err(err).Msg("unexpected error while loading .env file")
+				return fmt.Errorf("dotenv: unexpected error while loading environment variables from .env file")
 			}
 			log.Warn().Msg(".env file not found")
 		}
+
+		db, err := sql.Open("sqlite", "domains.db")
+		if nil != err {
+			return fmt.Errorf("db: unable to open database: %v", err)
+		}
+		defer func() {
+			log.Info().Msg("closing database connection")
+			if err := db.Close(); nil != err {
+				log.Error().Err(err).Msg("failed to close database connection")
+			}
+		}()
+		if err := db.PingContext(ctx); nil != err {
+			return fmt.Errorf("db: unable to ping database connection: %v", err)
+		}
+		if err := execPragmas(ctx, db); nil != err {
+			return fmt.Errorf("db: unable to execute database pragmas: %v", err)
+		}
+		log.Info().Msg("db: successfully executed database pragmas")
 
 		publishChatID, ok := os.LookupEnv(EnvKeyPublishChatID)
 		if !ok {

@@ -78,10 +78,18 @@ jobs:
     needs:
       - tag
     runs-on: ubuntu-latest
+    container:
+      image: docker.io/library/golang:1-alpine
     env:
       GOPROXY: https://goproxy.io,direct
+      CGO_ENABLED: 1
       app_version: ${{ needs.tag.outputs.tag }}
     steps:
+      - name: Update Packages
+        run: |
+          echo 'https://dl-cdn.alpinelinux.org/alpine/edge/main' > /etc/apk/repositories
+          echo 'https://dl-cdn.alpinelinux.org/alpine/edge/community' >> /etc/apk/repositories
+          apk update --no-cache && apk upgrade && apk add gcc musl-dev make
       - name: Checkout
         uses: actions/checkout@v3
         with:
