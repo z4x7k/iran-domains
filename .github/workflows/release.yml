@@ -82,6 +82,7 @@ jobs:
       image: docker.io/library/golang:1-alpine
       env:
         CGO_ENABLED: 1
+        CGO_CFLAGS: "-O2 -g -D_LARGEFILE64_SOURCE"
         app_version: ${{ needs.tag.outputs.tag }}
     steps:
       - name: Update Packages
