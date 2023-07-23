@@ -1,12 +1,10 @@
 -- +goose Up
 CREATE TABLE users_rate_limit (
-	peer CHARACTER(44) NOT NULL,
-	upload UNSIGNED BIG INT NOT NULL,
-	download UNSIGNED BIG INT NOT NULL,
-	ts UNSIGNED BIG INT NOT NULL
+	the_user_id BIGINT NOT NULL UNIQUE,
+	last_access_ts BIGINT NOT NULL,
+	the_count BIGINT NOT NULL
 );
-CREATE INDEX peers_usage_peer_IDX ON peers_usage (peer ASC);
-CREATE INDEX peers_usage_ts_IDX ON peers_usage (ts DESC);
+CREATE INDEX users_rate_limit_the_user_id_IDX ON users_rate_limit (the_user_id ASC);
 
 -- +goose Down
 DROP TABLE users_rate_limit;

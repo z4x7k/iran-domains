@@ -1,4 +1,5 @@
 /bin/
 /.vscode/
 /domains.txt
+/domains.db*
 /.env

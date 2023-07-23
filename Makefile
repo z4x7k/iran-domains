@@ -9,6 +9,10 @@ tidy:
 build-clean: clean build
 .PHONY: build-clean
 
+jet:
+	go run github.com/go-jet/jet/v2/cmd/jet@latest -source=sqlite -dsn=./domains.db -path=./db/gen
+.PHONY: jet
+
 test:
 	go test -trimpath -buildvcs=false -ldflags '-extldflags "-static" -s -w -buildid=' -race -failfast -vet=all -covermode=atomic -coverprofile=coverage.out -v ./...
 .PHONY: test

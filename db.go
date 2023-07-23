@@ -5,6 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/mattn/go-sqlite3"
+	"github.com/z4x7k/iran-domains-tg-bot/db/gen/model"
+	"github.com/z4x7k/iran-domains-tg-bot/db/gen/table"
 )
 
 func execPragmas(ctx context.Context, db *sql.DB) error {
@@ -39,6 +44,32 @@ func execPragmas(ctx context.Context, db *sql.DB) error {
 		if val != v {
 			return fmt.Errorf("pragma '%s' updated value is not equal to previously set expected value. expected %s, got: %v", k, v, val)
 		}
+	}
+
+	return nil
+}
+
+var (
+	errDuplicateDomain = errors.New("domain already exists")
+)
+
+func insertDomain(ctx context.Context, db *sql.DB, domain string) error {
+	now := time.Now().UTC().Unix()
+	res, err := table.Domains.
+		INSERT(table.Domains.AllColumns).
+		MODEL(model.Domains{Domain: domain, CreatedTs: now}).
+		ExecContext(ctx, db)
+	if nil != err {
+		sqlErr := sqlite3.Error{}
+		if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint && sqlErr.Error() == "UNIQUE constraint failed: domains.domain" {
+			return errDuplicateDomain
+		}
+		// TODO: handle duplicate domain error
+		return fmt.Errorf("db: failed to insert domain into database: %v", err)
+	} else if affectedRows, err := res.RowsAffected(); nil != err {
+		return fmt.Errorf("db: failed to get number of affected rows by domain insert query: %v", err)
+	} else if affectedRows != 1 {
+		return fmt.Errorf("expected 1 row to be affected by domain insert query, got %d", affectedRows)
 	}
 
 	return nil
