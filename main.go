@@ -85,7 +85,7 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			log.Warn().Msg(".env file not found")
 		}
 
-		db, err := sql.Open("sqlite", "domains.db")
+		db, err := sql.Open("sqlite3", "domains.db")
 		if nil != err {
 			return fmt.Errorf("db: unable to open database: %v", err)
 		}
