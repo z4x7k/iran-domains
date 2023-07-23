@@ -7,7 +7,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_type }}
   cancel-in-progress: true
 permissions:
-  contents: write
+  contents: none
   deployments: none
   actions: none
   checks: none
@@ -23,6 +23,8 @@ permissions:
 jobs:
   tag:
     name: Tag
+    permissions:
+      contents: write
     outputs:
       tag: ${{ steps.tag_version.outputs.new_tag }}
       release_name: ${{ steps.generate_tag_name.outputs.release_name }}
@@ -51,6 +53,8 @@ jobs:
           custom_tag: ${{ steps.generate_tag_name.outputs.tag_name }}
   build:
     name: Build
+    permissions:
+      contents: read
     needs:
       - tag
     runs-on: ubuntu-latest
@@ -92,6 +96,8 @@ jobs:
           name: bot
           path: ./bin/bot
   release:
+    permissions:
+      contents: write
     name: Release
     timeout-minutes: 10
     needs:
