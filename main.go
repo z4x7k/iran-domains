@@ -16,9 +16,9 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
-	_ "modernc.org/sqlite"
 )
 
 const (
