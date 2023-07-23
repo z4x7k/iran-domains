@@ -52,7 +52,7 @@ jobs:
             echo "::notice title='Generate Tag'::Found the same base tag name"
             export next_pkgrel=$((latest_tag_pkgrel + 1))
             echo "next_pkgrel: $next_pkgrel"
-            echo "pkgrel incremented to $pkgrel"
+            echo "pkgrel incremented to $next_pkgrel"
             next_tag_name=$(printf '%s-%d' $next_tag_name $next_pkgrel)
           else
             next_tag_name=$(printf '%s-1' $next_tag_name)
