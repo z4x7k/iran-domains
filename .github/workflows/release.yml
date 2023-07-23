@@ -1,0 +1,146 @@
+name: Build & Release
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_type }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  deployments: none
+  actions: none
+  checks: none
+  discussions: none
+  id-token: none
+  issues: none
+  packages: none
+  pages: none
+  pull-requests: none
+  repository-projects: none
+  security-events: none
+  statuses: none
+jobs:
+  tag:
+    name: Tag
+    outputs:
+      tag: ${{ steps.tag_version.outputs.new_tag }}
+      release_name: ${{ steps.generate_tag_name.outputs.release_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Generate Tag Name
+        run: |
+          export now=$(date -u)
+          export tag_name=$(date -d "$now" -u '+%Y.%m.%d.%H')
+          export release_name=$(date -d "$now" -u '+%Y/%m/%d %H:%M UTC')
+          echo "tag_name=$tag_name" >> $GITHUB_OUTPUT
+          echo "release_name=$release_name" >> $GITHUB_OUTPUT
+        id: generate_tag_name
+      - name: Tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          fetch_all_tags: true
+          create_annotated_tag: true
+          tag_prefix: v
+          custom_tag: ${{ steps.generate_tag_name.outputs.tag_name }}
+  build:
+    name: Build
+    needs:
+      - tag
+    runs-on: ubuntu-latest
+    env:
+      GOPROXY: https://goproxy.io,direct
+      app_version: ${{ needs.tag.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+          cache: false
+          check-latest: true
+      - name: Tidy
+        run: make tidy
+      - name: Build
+        run: make build-clean
+      - name: UPX
+        run: |
+          set -xe
+          export temp_dir=$(mktemp -d)
+          cd "$temp_dir"
+          wget https://github.com/upx/upx/releases/download/v4.0.2/upx-4.0.2-amd64_linux.tar.xz
+          tar -xvf upx-4.0.2-amd64_linux.tar.xz upx-4.0.2-amd64_linux/upx
+          mv ./upx-4.0.2-amd64_linux/upx .
+          cd -
+          "$temp_dir/upx" --no-color --mono --no-progress --ultra-brute --no-backup ./bin/bot
+          "$temp_dir/upx" --test ./bin/bot
+          rm -rfv "$temp_dir"
+      - name: Test
+        run: make test
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: bot
+          path: ./bin/bot
+  release:
+    name: Release
+    timeout-minutes: 10
+    needs:
+      - tag
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: bot
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        continue-on-error: true
+        id: release_try_0
+        with:
+          name: ${{ needs.tag.outputs.release_name }}
+          prerelease: false
+          tag_name: ${{ needs.tag.outputs.tag }}
+          files: ./bot
+      - name: Release (Retry 1)
+        uses: softprops/action-gh-release@v1
+        continue-on-error: true
+        if: steps.release_try_0.outcome == 'failure'
+        id: release_try_1
+        with:
+          name: ${{ needs.tag.outputs.release_name }}
+          prerelease: false
+          tag_name: ${{ needs.tag.outputs.tag }}
+          files: ./bot
+      - name: Release (Retry 2)
+        uses: softprops/action-gh-release@v1
+        continue-on-error: true
+        if: steps.release_try_1.outcome == 'failure'
+        id: release_try_2
+        with:
+          name: ${{ needs.tag.outputs.release_name }}
+          prerelease: false
+          tag_name: ${{ needs.tag.outputs.tag }}
+          files: ./bot
+      - name: Release (Retry 3)
+        uses: softprops/action-gh-release@v1
+        continue-on-error: false
+        if: steps.release_try_2.outcome == 'failure'
+        id: release_try_3
+        with:
+          name: ${{ needs.tag.outputs.release_name }}
+          prerelease: false
+          tag_name: ${{ needs.tag.outputs.tag }}
+          files: ./bot
