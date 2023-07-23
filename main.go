@@ -17,8 +17,10 @@ import (
 	"github.com/go-telegram/bot/models"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-sqlite3"
+	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
+	"github.com/z4x7k/iran-domains-tg-bot/db/migration"
 )
 
 const (
@@ -115,6 +117,17 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			return fmt.Errorf("db: unable to execute database pragmas: %v", err)
 		}
 		log.Info().Msg("db: successfully executed database pragmas")
+
+		goose.SetLogger(goose.NopLogger())
+		goose.SetTableName("migrations")
+		goose.SetBaseFS(migration.FS)
+		if err := goose.SetDialect("sqlite"); nil != err {
+			return fmt.Errorf("unable to set goose dialect to sqlite: %v", err)
+		}
+		if err := goose.Up(db, "scripts"); nil != err {
+			return fmt.Errorf("unable to execute goose migrations: %v", err)
+		}
+		log.Info().Msg("executed database migrations")
 
 		publishChatID, ok := os.LookupEnv(EnvKeyPublishChatID)
 		if !ok {
