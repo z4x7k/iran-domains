@@ -89,6 +89,7 @@ jobs:
           echo 'https://dl-cdn.alpinelinux.org/alpine/edge/main' > /etc/apk/repositories
           echo 'https://dl-cdn.alpinelinux.org/alpine/edge/community' >> /etc/apk/repositories
           apk update --no-cache && apk upgrade && apk add gcc musl-dev make
+          go env
       - name: Checkout
         uses: actions/checkout@v3
         with:
