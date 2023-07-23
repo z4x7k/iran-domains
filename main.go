@@ -16,7 +16,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/joho/godotenv"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 )
@@ -98,6 +98,8 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 		if err := db.PingContext(ctx); nil != err {
 			return fmt.Errorf("db: unable to ping database connection: %v", err)
 		}
+		sqliteLibVersion, sqliteLibVersionNumber, _ := sqlite3.Version()
+		log.Info().Str("lib_version", sqliteLibVersion).Int("lib_version_number", sqliteLibVersionNumber).Msg("successfully connected to sqlite database")
 		if err := execPragmas(ctx, db); nil != err {
 			return fmt.Errorf("db: unable to execute database pragmas: %v", err)
 		}
