@@ -29,6 +29,7 @@ const (
 	ParseModeMarkdownV1              = models.ParseMode("Markdown")
 	CLIRunCommandName                = "run"
 	CLIRunCommandDomainsFileNameFlag = "domains"
+	CLIRunCommandDBFileNameFlag      = "db"
 )
 
 var (
@@ -63,6 +64,11 @@ func main() {
 						Usage:    "Domains file name. Defaults to domains.txt in the current working directory",
 						Required: false,
 					},
+					&cli.StringFlag{
+						Name:     CLIRunCommandDBFileNameFlag,
+						Usage:    "Database file name. Defaults to domains.db in the current working directory",
+						Required: false,
+					},
 				},
 			},
 		},
@@ -85,7 +91,12 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			log.Warn().Msg(".env file not found")
 		}
 
-		db, err := sql.Open("sqlite3", "domains.db")
+		dbFileName := cliCtx.String(CLIRunCommandDBFileNameFlag)
+		if dbFileName == "" {
+			dbFileName = "domains.db"
+		}
+
+		db, err := sql.Open("sqlite3", dbFileName)
 		if nil != err {
 			return fmt.Errorf("db: unable to open database: %v", err)
 		}
@@ -125,6 +136,7 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			domainsFileName:   domainsFileName,
 			publishChatID:     publishChatID,
 			supportUserChatID: supportUserChatID,
+			db:                db,
 		}
 
 		httpTransport := http.Transport{IdleConnTimeout: 10 * time.Second, ResponseHeaderTimeout: 30 * time.Second}
@@ -168,6 +180,7 @@ type Handler struct {
 	domainsFileName   string
 	publishChatID     string
 	supportUserChatID string
+	db                *sql.DB
 }
 
 func extractDomainApexZone(msg string) (string, error) {
@@ -202,11 +215,11 @@ func extractDomainApexZone(msg string) (string, error) {
 	return apex + "." + tld, nil
 }
 
-// TODO: add rate limit to prevent destination file to become huge
 func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if shouldDiscard(update) {
 		return
 	}
+	// TODO: check if user can pass the daily rate limit
 	log := h.loggerFromUpdate(update)
 
 	domain, err := extractDomainApexZone(update.Message.Text)
@@ -275,6 +288,8 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 		h.informSupport(ctx, b, err)
 		return
 	}
+
+	// TODO: increment user today's usage by one
 
 	chatID := update.Message.Chat.ID
 	replyMsg = bot.SendMessageParams{
