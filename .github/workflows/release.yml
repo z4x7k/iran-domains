@@ -38,9 +38,9 @@ jobs:
         run: |
           export latest_tag=$(wget -qO- https://api.github.com/repos/${{ github.repository }}/releases | jq -r 'first(.[]) | .tag_name' | sed s/^v//)
           echo "latest_tag: $latest_tag"
-          export latest_tag_base_name=$(cut -d '-' -f 1 <<< $tag)
+          export latest_tag_base_name=$(cut -d '-' -f 1 <<< $latest_tag)
           echo "latest_tag_base_name: $latest_tag_base_name"
-          export latest_tag_pkgrel=$(cut -d '-' -f 2 <<< $tag)
+          export latest_tag_pkgrel=$(cut -d '-' -f 2 <<< $latest_tag)
           echo "latest_tag_pkgrel: $latest_tag_pkgrel"
           export now=$(date -u)
           echo "now: $now"
