@@ -99,7 +99,7 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 		}
 
 		handler := Handler{
-			logger:            log.With().Str("app", "handler").Logger(),
+			log:               log,
 			domainsFileName:   domainsFileName,
 			publishChatID:     publishChatID,
 			supportUserChatID: supportUserChatID,
@@ -142,7 +142,7 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 }
 
 type Handler struct {
-	logger            zerolog.Logger
+	log               zerolog.Logger
 	domainsFileName   string
 	publishChatID     string
 	supportUserChatID string
@@ -221,7 +221,7 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 			Err(err).
 			Str("domains_filename", h.domainsFileName).
 			Msg("failed to open domains file")
-		h.informSupport(ctx, b)
+		h.informSupport(ctx, b, err)
 		return
 	}
 	defer func() {
@@ -239,7 +239,7 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 			Str("text_to_write", textToWrite).
 			Str("domains_filename", h.domainsFileName).
 			Msg("failed to write domain to domains file")
-		h.informSupport(ctx, b)
+		h.informSupport(ctx, b, err)
 		return
 	} else if expectedBytes := len(textToWrite); n != expectedBytes {
 		log.
@@ -250,7 +250,7 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 			Str("text_to_write", textToWrite).
 			Str("domains_filename", h.domainsFileName).
 			Msg("unexpected number of bytes was written to the domains file")
-		h.informSupport(ctx, b)
+		h.informSupport(ctx, b, err)
 		return
 	}
 
@@ -274,16 +274,18 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 	}
 }
 
-func (h *Handler) informSupport(ctx context.Context, b *bot.Bot) {
+func (h *Handler) informSupport(ctx context.Context, b *bot.Bot, err error) {
 	chatID := h.supportUserChatID
 	msg := bot.SendMessageParams{
-		ChatID: chatID,
-		Text:   "An unexpected error occurred. Please check the logs...",
+		ChatID:    chatID,
+		Text:      "An unexpected error occurred. Please check the logs...\n\n```\n" + err.Error() + "```",
+		ParseMode: ParseModeMarkdownV1,
 	}
-	if _, err := b.SendMessage(ctx, &msg); nil != err {
-		h.logger.
+	if _, sendErr := b.SendMessage(ctx, &msg); nil != sendErr {
+		h.log.
 			Error().
-			Err(err).
+			Err(sendErr).
+			AnErr("root_error", err).
 			Dict("reply_message", zerolog.Dict().
 				Str("chat_id", chatID),
 			).

@@ -6,7 +6,7 @@ import (
 )
 
 func (h *Handler) loggerFromUpdate(update *models.Update) zerolog.Logger {
-	return h.logger.
+	return h.log.
 		With().
 		Int64("chat_id", update.Message.Chat.ID).
 		Str("chat_username", update.Message.Chat.Username).
