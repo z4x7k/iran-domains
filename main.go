@@ -20,17 +20,16 @@ import (
 )
 
 const (
-	AllowedUserIDsEnvKey             = "ALLOWED_USER_IDS"
-	BotTokenEnvKey                   = "BOT_TOKEN"
-	PublishChatIDEnvKey              = "PUBLISH_CHAT_ID"
-	BotHTTPProxyURL                  = "BOT_HTTP_PROXY_URL"
+	EnvKeyBotToken                   = "BOT_TOKEN"
+	EnvKeyPublishChatID              = "PUBLISH_CHAT_ID"
+	EnvKeySupportUserChatID          = "SUPPORT_USER_CHAT_ID"
+	EnvKeyBotHTTPProxyURL            = "BOT_HTTP_PROXY_URL"
 	ParseModeMarkdownV1              = models.ParseMode("Markdown")
 	CLIRunCommandName                = "run"
 	CLIRunCommandDomainsFileNameFlag = "domains"
 )
 
 var (
-	allowedUserIDs []string
 	AppVersion     = "0.0.0"
 	AppCompileTime = "1991-11-22T00:11:22+00:00"
 )
@@ -84,9 +83,14 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			log.Warn().Msg(".env file not found")
 		}
 
-		publishChatID, ok := os.LookupEnv(PublishChatIDEnvKey)
+		publishChatID, ok := os.LookupEnv(EnvKeyPublishChatID)
 		if !ok {
-			log.Fatal().Str("key", PublishChatIDEnvKey).Msg("required environment variable is not set")
+			log.Fatal().Str("key", EnvKeyPublishChatID).Msg("required environment variable is not set")
+		}
+
+		supportUserChatID, ok := os.LookupEnv(EnvKeySupportUserChatID)
+		if !ok {
+			log.Fatal().Str("key", EnvKeySupportUserChatID).Msg("required environment variable is not set")
 		}
 
 		domainsFileName := cliCtx.String(CLIRunCommandDomainsFileNameFlag)
@@ -95,15 +99,16 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 		}
 
 		handler := Handler{
-			logger:          log.With().Str("app", "handler").Logger(),
-			domainsFileName: domainsFileName,
-			publishChatID:   publishChatID,
+			logger:            log.With().Str("app", "handler").Logger(),
+			domainsFileName:   domainsFileName,
+			publishChatID:     publishChatID,
+			supportUserChatID: supportUserChatID,
 		}
 
 		httpTransport := http.Transport{IdleConnTimeout: 10 * time.Second, ResponseHeaderTimeout: 30 * time.Second}
 		httpClient := http.Client{Timeout: time.Second * 35, Transport: &httpTransport}
-		proxyURL, ok := os.LookupEnv(BotHTTPProxyURL)
-		if ok {
+		proxyURL, ok := os.LookupEnv(EnvKeyBotHTTPProxyURL)
+		if ok && proxyURL != "" {
 			httpProxyURL, err := url.Parse(proxyURL)
 			if nil != err {
 				log.Fatal().Err(err).Msg("failed to parse bot http proxy url")
@@ -117,9 +122,9 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			bot.WithDefaultHandler(handler.handleMessage),
 		}
 
-		token, ok := os.LookupEnv(BotTokenEnvKey)
+		token, ok := os.LookupEnv(EnvKeyBotToken)
 		if !ok {
-			log.Fatal().Str("key", BotTokenEnvKey).Msg("required environment variable is not set")
+			log.Fatal().Str("key", EnvKeyBotToken).Msg("required environment variable is not set")
 		}
 
 		b, err := bot.New(token, opts...)
@@ -137,9 +142,10 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 }
 
 type Handler struct {
-	logger          zerolog.Logger
-	domainsFileName string
-	publishChatID   string
+	logger            zerolog.Logger
+	domainsFileName   string
+	publishChatID     string
+	supportUserChatID string
 }
 
 func extractDomainApexZone(msg string) (string, error) {
@@ -215,6 +221,7 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 			Err(err).
 			Str("domains_filename", h.domainsFileName).
 			Msg("failed to open domains file")
+		h.informSupport(ctx, b)
 		return
 	}
 	defer func() {
@@ -223,21 +230,27 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 		}
 	}()
 
-	toWrite := domain + "\n"
-	if n, err := file.WriteString(toWrite); nil != err {
+	textToWrite := domain + "\n"
+	if n, err := file.WriteString(textToWrite); nil != err {
 		log.
 			Error().
 			Err(err).
+			Str("filename", file.Name()).
+			Str("text_to_write", textToWrite).
 			Str("domains_filename", h.domainsFileName).
 			Msg("failed to write domain to domains file")
+		h.informSupport(ctx, b)
 		return
-	} else if expectedBytes := len(toWrite); n != expectedBytes {
+	} else if expectedBytes := len(textToWrite); n != expectedBytes {
 		log.
 			Warn().
+			Str("filename", file.Name()).
 			Int("written_bytes_no", n).
 			Int("expected_bytes_no", expectedBytes).
+			Str("text_to_write", textToWrite).
 			Str("domains_filename", h.domainsFileName).
 			Msg("unexpected number of bytes was written to the domains file")
+		h.informSupport(ctx, b)
 		return
 	}
 
@@ -257,6 +270,24 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 				Str("text", successMessageText),
 			).
 			Msg("failed to send success reply message to user chat")
+		return
+	}
+}
+
+func (h *Handler) informSupport(ctx context.Context, b *bot.Bot) {
+	chatID := h.supportUserChatID
+	msg := bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   "An unexpected error occurred. Please check the logs...",
+	}
+	if _, err := b.SendMessage(ctx, &msg); nil != err {
+		h.logger.
+			Error().
+			Err(err).
+			Dict("reply_message", zerolog.Dict().
+				Str("chat_id", chatID),
+			).
+			Msg("failed to send message to support user chat")
 		return
 	}
 }
