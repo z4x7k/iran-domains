@@ -20,6 +20,8 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
+
+	"github.com/z4x7k/iran-domains-tg-bot/db"
 	"github.com/z4x7k/iran-domains-tg-bot/db/migration"
 	"github.com/z4x7k/iran-domains-tg-bot/ratelimit"
 )
@@ -31,7 +33,7 @@ const (
 	ParseModeMarkdownV1          = models.ParseMode("Markdown")
 	CLIRunCommandName            = "run"
 	CLIRunCommandDBFileNameFlag  = "db"
-	RateLimiterMaxAttemptsPerDay = 200
+	RateLimiterMaxAttemptsPerDay = 10
 )
 
 var (
@@ -97,22 +99,22 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			dbFileName = "domains.db"
 		}
 
-		db, err := sql.Open("sqlite3", dbFileName)
+		dbConn, err := sql.Open("sqlite3", dbFileName)
 		if nil != err {
 			return fmt.Errorf("db: failed to open database: %v", err)
 		}
 		defer func() {
 			log.Info().Msg("closing database connection")
-			if err := db.Close(); nil != err {
+			if err := dbConn.Close(); nil != err {
 				log.Error().Err(err).Msg("failed to close database connection")
 			}
 		}()
-		if err := db.PingContext(ctx); nil != err {
+		if err := dbConn.PingContext(ctx); nil != err {
 			return fmt.Errorf("db: failed to ping database connection: %v", err)
 		}
 		sqliteLibVersion, sqliteLibVersionNumber, _ := sqlite3.Version()
 		log.Info().Str("lib_version", sqliteLibVersion).Int("lib_version_number", sqliteLibVersionNumber).Msg("successfully connected to sqlite database")
-		if err := execPragmas(ctx, db); nil != err {
+		if err := db.ExecPragmas(ctx, dbConn); nil != err {
 			return fmt.Errorf("db: unable to execute database pragmas: %v", err)
 		}
 		log.Info().Msg("successfully executed database pragmas")
@@ -123,7 +125,7 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 		if err := goose.SetDialect("sqlite3"); nil != err {
 			return fmt.Errorf("db: failed to set goose dialect to sqlite: %v", err)
 		}
-		if err := goose.Up(db, "scripts"); nil != err {
+		if err := goose.Up(dbConn, "scripts"); nil != err {
 			return fmt.Errorf("db: failed to execute goose migrations: %v", err)
 		}
 		log.Info().Msg("executed database migrations")
@@ -133,12 +135,12 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			return fmt.Errorf("env: required environment variable '%s' is not set", EnvKeyPublishChatID)
 		}
 
-		rl := ratelimit.New(db, RateLimiterMaxAttemptsPerDay, time.Hour*24)
+		rl := ratelimit.New(dbConn, RateLimiterMaxAttemptsPerDay, time.Second*24)
 
 		handler := Handler{
 			log:           log,
 			publishChatID: publishChatID,
-			db:            db,
+			db:            dbConn,
 			rateLimiter:   &rl,
 		}
 
@@ -224,7 +226,12 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 
 	log := h.loggerFromUpdate(update)
 
-	if canPass, err := h.rateLimiter.CanPass(ctx, update.Message.From.ID); nil != err {
+	userID := update.Message.From.ID
+	if canPass, err := h.rateLimiter.CanPass(ctx, userID); nil != err {
+		if errors.Is(err, db.ErrBusy) {
+			log.Error().Msg("got database is busy error on user rate limit check")
+			return
+		}
 		log.Error().Err(err).Msg("failed to check user rate limit")
 	} else if !canPass {
 		return
@@ -240,8 +247,12 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 	}
 	log = log.With().Str("domain", domain).Logger()
 
-	if err := insertDomain(ctx, h.db, domain); nil != err {
-		if errors.Is(err, errDuplicateDomain) {
+	if err := db.InsertDomain(ctx, h.db, domain, userID); nil != err {
+		if errors.Is(err, db.ErrBusy) {
+			log.Error().Msg("got database is busy error on domain insertion")
+			return
+		}
+		if errors.Is(err, db.ErrDuplicateDomain) {
 			return
 		}
 		log.Error().Err(err).Msg("failed to insert domain into database")

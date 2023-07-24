@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/z4x7k/iran-domains-tg-bot/db/gen/table"
 )
 
-func execPragmas(ctx context.Context, db *sql.DB) error {
+func ExecPragmas(ctx context.Context, db *sql.DB) error {
 	pragmas := [][]string{
 		{"journal_mode", "wal"},
 		{"wal_autocheckpoint", "0"},
@@ -50,21 +50,24 @@ func execPragmas(ctx context.Context, db *sql.DB) error {
 }
 
 var (
-	errDuplicateDomain = errors.New("domain already exists")
+	ErrDuplicateDomain = errors.New("domain already exists")
+	ErrBusy            = errors.New("database is busy at the moment. try again later")
 )
 
-func insertDomain(ctx context.Context, db *sql.DB, domain string) error {
+func InsertDomain(ctx context.Context, db *sql.DB, domain string, userID int64) error {
 	now := time.Now().UTC().Unix()
 	res, err := table.Domains.
 		INSERT(table.Domains.AllColumns).
-		MODEL(model.Domains{Domain: domain, CreatedTs: now}).
+		MODEL(model.Domains{Domain: domain, CreatedTs: now, CreatedByID: userID}).
 		ExecContext(ctx, db)
 	if nil != err {
-		sqlErr := sqlite3.Error{}
-		if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint && sqlErr.Error() == "UNIQUE constraint failed: domains.domain" {
-			return errDuplicateDomain
+		var sqlErr sqlite3.Error
+		if errors.As(err, &sqlErr) {
+
+			if sqlErr.Code == sqlite3.ErrConstraint && sqlErr.Error() == "UNIQUE constraint failed: domains.domain" {
+				return ErrDuplicateDomain
+			}
 		}
-		// TODO: handle duplicate domain error
 		return fmt.Errorf("db: failed to insert domain into database: %v", err)
 	} else if affectedRows, err := res.RowsAffected(); nil != err {
 		return fmt.Errorf("db: failed to get number of affected rows by domain insert query: %v", err)

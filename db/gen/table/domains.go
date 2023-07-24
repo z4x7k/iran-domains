@@ -17,8 +17,9 @@ type domainsTable struct {
 	sqlite.Table
 
 	// Columns
-	Domain    sqlite.ColumnString
-	CreatedTs sqlite.ColumnInteger
+	Domain      sqlite.ColumnString
+	CreatedTs   sqlite.ColumnInteger
+	CreatedByID sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -59,18 +60,20 @@ func newDomainsTable(schemaName, tableName, alias string) *DomainsTable {
 
 func newDomainsTableImpl(schemaName, tableName, alias string) domainsTable {
 	var (
-		DomainColumn    = sqlite.StringColumn("domain")
-		CreatedTsColumn = sqlite.IntegerColumn("created_ts")
-		allColumns      = sqlite.ColumnList{DomainColumn, CreatedTsColumn}
-		mutableColumns  = sqlite.ColumnList{DomainColumn, CreatedTsColumn}
+		DomainColumn      = sqlite.StringColumn("domain")
+		CreatedTsColumn   = sqlite.IntegerColumn("created_ts")
+		CreatedByIDColumn = sqlite.IntegerColumn("created_by_id")
+		allColumns        = sqlite.ColumnList{DomainColumn, CreatedTsColumn, CreatedByIDColumn}
+		mutableColumns    = sqlite.ColumnList{CreatedTsColumn, CreatedByIDColumn}
 	)
 
 	return domainsTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		Domain:    DomainColumn,
-		CreatedTs: CreatedTsColumn,
+		Domain:      DomainColumn,
+		CreatedTs:   CreatedTsColumn,
+		CreatedByID: CreatedByIDColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

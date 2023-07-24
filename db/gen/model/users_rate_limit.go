@@ -8,7 +8,7 @@
 package model
 
 type UsersRateLimit struct {
-	TheUserID    int64
+	TheUserID    int64 `sql:"primary_key"`
 	LastAccessTs int64
 	TheCount     int64
 }

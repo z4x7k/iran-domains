@@ -8,6 +8,7 @@
 package model
 
 type Domains struct {
-	Domain    string
-	CreatedTs int64
+	Domain      string `sql:"primary_key"`
+	CreatedTs   int64
+	CreatedByID int64
 }

@@ -1,9 +1,9 @@
 -- +goose Up
 CREATE TABLE domains (
-	domain TEXT NOT NULL UNIQUE,
-	created_ts BIGINT NOT NULL
+	domain TEXT NOT NULL PRIMARY KEY,
+	created_ts BIGINT NOT NULL,
+  created_by_id BIGINT NOT NULL
 );
-CREATE INDEX domains_domain_IDX ON domains (domain ASC);
 
 -- +goose Down
 DROP TABLE domains;

@@ -64,7 +64,7 @@ func newUsersRateLimitTableImpl(schemaName, tableName, alias string) usersRateLi
 		LastAccessTsColumn = sqlite.IntegerColumn("last_access_ts")
 		TheCountColumn     = sqlite.IntegerColumn("the_count")
 		allColumns         = sqlite.ColumnList{TheUserIDColumn, LastAccessTsColumn, TheCountColumn}
-		mutableColumns     = sqlite.ColumnList{TheUserIDColumn, LastAccessTsColumn, TheCountColumn}
+		mutableColumns     = sqlite.ColumnList{LastAccessTsColumn, TheCountColumn}
 	)
 
 	return usersRateLimitTable{

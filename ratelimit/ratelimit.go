@@ -3,10 +3,14 @@ package ratelimit
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-jet/jet/v2/sqlite"
+	"github.com/mattn/go-sqlite3"
+
+	"github.com/z4x7k/iran-domains-tg-bot/db"
 	"github.com/z4x7k/iran-domains-tg-bot/db/gen/model"
 	"github.com/z4x7k/iran-domains-tg-bot/db/gen/table"
 )
@@ -28,7 +32,7 @@ func New(db *sql.DB, MaxAttempts int, Interval time.Duration) RateLimiter {
 func (r *RateLimiter) CanPass(ctx context.Context, userID int64) (bool, error) {
 	now := time.Now().UTC().Unix()
 	intervalMillis := int64(r.interval.Seconds())
-	stmt := table.UsersRateLimit.
+	query, args := table.UsersRateLimit.
 		INSERT(table.UsersRateLimit.AllColumns).
 		MODEL(model.UsersRateLimit{TheUserID: userID, LastAccessTs: now, TheCount: 0}).
 		ON_CONFLICT(table.UsersRateLimit.TheUserID).
@@ -76,10 +80,16 @@ func (r *RateLimiter) CanPass(ctx context.Context, userID int64) (bool, error) {
 					),
 				),
 		).
-		RETURNING(table.UsersRateLimit.TheCount)
-	query, args := stmt.Sql()
+		RETURNING(table.UsersRateLimit.TheCount).
+		Sql()
 	var theCount int
 	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&theCount); nil != err {
+		var sqlErr sqlite3.Error
+		if errors.As(err, &sqlErr) {
+			if sqlErr.Code == sqlite3.ErrBusy && sqlErr.Error() == "database is locked" {
+				return false, db.ErrBusy
+			}
+		}
 		return false, fmt.Errorf("db: failed to query user rate limit counter: %v", err)
 	}
 	fmt.Println(theCount) // TODO: remove me!
