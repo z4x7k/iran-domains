@@ -32,7 +32,8 @@ const (
 	EnvKeyBotHTTPProxyURL        = "BOT_HTTP_PROXY_URL"
 	ParseModeMarkdownV1          = models.ParseMode("Markdown")
 	CLIRunCommandName            = "run"
-	CLIRunCommandDBFileNameFlag  = "db"
+	CLIRunCommandDBFileFlag      = "db"
+	CLIRunCommandEnvFileFlag     = "env"
 	RateLimiterMaxAttemptsPerDay = 300
 )
 
@@ -63,7 +64,13 @@ func main() {
 				Action: buildBot(log),
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     CLIRunCommandDBFileNameFlag,
+						Name:     CLIRunCommandEnvFileFlag,
+						Aliases:  []string{"e"},
+						Usage:    "Custom .env file. Defaults to .env in the current working directory",
+						Required: false,
+					},
+					&cli.StringFlag{
+						Name:     CLIRunCommandDBFileFlag,
 						Usage:    "Database file name. Defaults to domains.db in the current working directory",
 						Required: false,
 					},
@@ -82,7 +89,12 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 		ctx, cancel := signal.NotifyContext(cliCtx.Context, os.Interrupt)
 		defer cancel()
 
-		if err := godotenv.Load(); nil != err {
+		envFilename := cliCtx.String(CLIRunCommandEnvFileFlag)
+		if envFilename == "" {
+			envFilename = ".env"
+		}
+
+		if err := godotenv.Load(envFilename); nil != err {
 			if !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("env: unexpected error while loading environment variables from .env file")
 			}
@@ -94,12 +106,12 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			return errors.New("env: TZ environment variable must be set to UTC")
 		}
 
-		dbFileName := cliCtx.String(CLIRunCommandDBFileNameFlag)
-		if dbFileName == "" {
-			dbFileName = "domains.db"
+		dbFilename := cliCtx.String(CLIRunCommandDBFileFlag)
+		if dbFilename == "" {
+			dbFilename = "domains.db"
 		}
 
-		dbConn, err := sql.Open("sqlite3", dbFileName)
+		dbConn, err := sql.Open("sqlite3", dbFilename)
 		if nil != err {
 			return fmt.Errorf("db: failed to open database: %v", err)
 		}
