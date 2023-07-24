@@ -16,7 +16,7 @@ It's accessible on Telegram with username: [`@iran_domains_bot`](http://t.me/ira
 2. Download `.env` template file:
 
     ```sh
-    curl -SfLo .env https://raw.githubusercontent.com/z4x7k/iran-domains-tg-bot/main/.env.template
+    curl -SfLo .ir-domains-bot.env https://raw.githubusercontent.com/z4x7k/iran-domains-tg-bot/main/.env.template
     ```
 
 3. Set proper values in `.env`
@@ -28,7 +28,7 @@ It's accessible on Telegram with username: [`@iran_domains_bot`](http://t.me/ira
 
 ## SystemD Service Unit
 
-Write the content below in a service unit file, e.g., `~/.config/systemd/user/ir-domain-bot.service`
+Write the content below in a service unit file, e.g., `~/.config/systemd/user/ir-domains-bot.service`
 
 ```service
 [Unit]
@@ -52,9 +52,9 @@ WantedBy=multi-user.target
 Then execute the following commands to activate, start, and enable start-on-boot the service:
 
 ```sh
-sudo systemctl --user daemon-reload
-sudo systemctl --user start ir-domain-bot.service
-sudo systemctl --user enable ir-domain-bot.service
+systemctl --user daemon-reload
+systemctl --user start ir-domains-bot.service
+systemctl --user enable ir-domains-bot.service
 ```
 
 **Note**: in order for start-on-boot to work for user service unit to work, run the following command if you haven't already:
