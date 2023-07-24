@@ -27,7 +27,6 @@ jobs:
       contents: write
     outputs:
       tag: ${{ steps.tag_version.outputs.new_tag }}
-      release_name: ${{ steps.generate_tag_name.outputs.release_name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,30 +36,18 @@ jobs:
       - name: Generate Tag Name
         run: |
           export latest_tag=$(wget -qO- https://api.github.com/repos/${{ github.repository }}/releases | jq -r 'first(.[]) | .tag_name' | sed s/^v//)
-          echo "latest_tag: $latest_tag"
           export latest_tag_base_name=$(cut -d '-' -f 1 <<< $latest_tag)
-          echo "latest_tag_base_name: $latest_tag_base_name"
           export latest_tag_pkgrel=$(cut -d '-' -f 2 <<< $latest_tag)
-          echo "latest_tag_pkgrel: $latest_tag_pkgrel"
-          export now=$(date -u)
-          echo "now: $now"
-          export next_tag_base_name=$(date -d "$now" -u '+%Y.%-m.%d')
-          echo "next_tag_base_name: $next_tag_base_name"
+          export next_tag_base_name=$(date -u '+%Y.%-m.%d')
           export next_tag_name=$next_tag_base_name
-          echo "next_tag_name: $next_tag_name"
           if [[ "$latest_tag_base_name" == "$next_tag_base_name" ]]; then
             echo "::notice title='Generate Tag'::Found the same base tag name"
             export next_pkgrel=$((latest_tag_pkgrel + 1))
-            echo "next_pkgrel: $next_pkgrel"
-            echo "pkgrel incremented to $next_pkgrel"
             next_tag_name=$(printf '%s-%d' $next_tag_name $next_pkgrel)
           else
             next_tag_name=$(printf '%s-1' $next_tag_name)
           fi
-            echo "next_tag_name: $next_tag_name"
-          export release_name=$(date -d "$now" -u '+%Y/%m/%d %H:%M UTC')
           echo "tag_name=$next_tag_name" >> $GITHUB_OUTPUT
-          echo "release_name=$release_name" >> $GITHUB_OUTPUT
         id: generate_tag_name
       - name: Tag
         id: tag_version
@@ -137,7 +124,7 @@ jobs:
         continue-on-error: true
         id: release_try_0
         with:
-          name: ${{ needs.tag.outputs.release_name }}
+          name: ${{ needs.tag.outputs.tag }}
           prerelease: false
           tag_name: ${{ needs.tag.outputs.tag }}
           files: ./bot
@@ -147,7 +134,7 @@ jobs:
         if: steps.release_try_0.outcome == 'failure'
         id: release_try_1
         with:
-          name: ${{ needs.tag.outputs.release_name }}
+          name: ${{ needs.tag.outputs.tag }}
           prerelease: false
           tag_name: ${{ needs.tag.outputs.tag }}
           files: ./bot
@@ -157,7 +144,7 @@ jobs:
         if: steps.release_try_1.outcome == 'failure'
         id: release_try_2
         with:
-          name: ${{ needs.tag.outputs.release_name }}
+          name: ${{ needs.tag.outputs.tag }}
           prerelease: false
           tag_name: ${{ needs.tag.outputs.tag }}
           files: ./bot
@@ -167,7 +154,7 @@ jobs:
         if: steps.release_try_2.outcome == 'failure'
         id: release_try_3
         with:
-          name: ${{ needs.tag.outputs.release_name }}
+          name: ${{ needs.tag.outputs.tag }}
           prerelease: false
           tag_name: ${{ needs.tag.outputs.tag }}
           files: ./bot
