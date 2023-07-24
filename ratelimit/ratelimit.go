@@ -92,6 +92,5 @@ func (r *RateLimiter) CanPass(ctx context.Context, userID int64) (bool, error) {
 		}
 		return false, fmt.Errorf("db: failed to query user rate limit counter: %v", err)
 	}
-	fmt.Println(theCount) // TODO: remove me!
 	return theCount < r.maxAttempts, nil
 }

@@ -1,6 +1,8 @@
 package main
 
-import "github.com/go-telegram/bot/models"
+import (
+	"github.com/go-telegram/bot/models"
+)
 
 func shouldDiscard(update *models.Update) bool {
 	checks := []func() bool{
