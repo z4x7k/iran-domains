@@ -12,7 +12,7 @@ func ExecPragmas(ctx context.Context, db *sql.DB) error {
 		{"journal_mode", "wal"},
 		{"wal_autocheckpoint", "0"},
 		{"synchronous", "3"},
-		{"locking_mode", "exclusive"},
+		{"locking_mode", "normal"},
 		{"journal_size_limit", "-1"},
 		{"checkpoint_fullfsync", "1"},
 		{"fullfsync", "1"},

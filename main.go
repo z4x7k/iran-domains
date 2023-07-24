@@ -33,7 +33,7 @@ const (
 	ParseModeMarkdownV1          = models.ParseMode("Markdown")
 	CLIRunCommandName            = "run"
 	CLIRunCommandDBFileNameFlag  = "db"
-	RateLimiterMaxAttemptsPerDay = 10
+	RateLimiterMaxAttemptsPerDay = 300
 )
 
 var (
@@ -135,7 +135,7 @@ func buildBot(log zerolog.Logger) func(*cli.Context) error {
 			return fmt.Errorf("env: required environment variable '%s' is not set", EnvKeyPublishChatID)
 		}
 
-		rl := ratelimit.New(dbConn, RateLimiterMaxAttemptsPerDay, time.Second*24)
+		rl := ratelimit.New(dbConn, RateLimiterMaxAttemptsPerDay, time.Hour*24)
 
 		handler := Handler{
 			log:           log,
