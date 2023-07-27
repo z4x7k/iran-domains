@@ -23,6 +23,7 @@ import (
 
 	"github.com/z4x7k/iran-domains-tg-bot/db"
 	"github.com/z4x7k/iran-domains-tg-bot/db/migration"
+	"github.com/z4x7k/iran-domains-tg-bot/dns"
 	"github.com/z4x7k/iran-domains-tg-bot/ratelimit"
 )
 
@@ -238,14 +239,17 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 
 	log := h.loggerFromUpdate(update)
 
+	chatID := update.Message.Chat.ID
 	userID := update.Message.From.ID
 	if canPass, err := h.rateLimiter.CanPass(ctx, userID); nil != err {
+		h.informSupport(ctx, b, err)
 		if errors.Is(err, db.ErrBusy) {
 			log.Error().Msg("got database is busy error on user rate limit check")
 			return
 		}
 		log.Error().Err(err).Msg("failed to check user rate limit")
 	} else if !canPass {
+		h.replyRateLimitExceeded(ctx, b, chatID)
 		return
 	}
 
@@ -255,25 +259,38 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 			Debug().
 			Err(err).
 			Msg("failed to extract domain from message text")
+		h.replyInvalidDomain(ctx, b, chatID)
 		return
 	}
 	log = log.With().Str("domain", domain).Logger()
 
+	if isResolvable, err := dns.IsDomainResolvable(ctx, domain, dns.WithRetries(3)); nil != err {
+		h.replyInvalidDomain(ctx, b, chatID)
+		log.Debug().Err(err).Msg("got error from dns resolver resolving domain")
+		return
+	} else if !isResolvable {
+		h.replyInvalidDomain(ctx, b, chatID)
+		log.Debug().Msg("domain is not resolvable")
+		return
+	}
+
 	if err := db.InsertDomain(ctx, h.db, domain, userID); nil != err {
+		if errors.Is(err, db.ErrDuplicateDomain) {
+			h.replyDuplicateDomain(ctx, b, chatID)
+			return
+		}
 		if errors.Is(err, db.ErrBusy) {
+			h.replyInternalError(ctx, b, chatID)
 			log.Error().Msg("got database is busy error on domain insertion")
 			return
 		}
-		if errors.Is(err, db.ErrDuplicateDomain) {
-			return
-		}
 		log.Error().Err(err).Msg("failed to insert domain into database")
+		h.replyInternalError(ctx, b, chatID)
 		h.informSupport(ctx, b, err)
 		return
 	}
 
 	successMessageText := "`" + domain + "`"
-	chatID := update.Message.Chat.ID
 	replyMsg := bot.SendMessageParams{
 		ChatID:           chatID,
 		ReplyToMessageID: update.Message.ID,
@@ -289,6 +306,77 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 				Str("text", successMessageText),
 			).
 			Msg("failed to send success reply message to user chat")
+		return
+	}
+}
+
+func (h *Handler) replyDuplicateDomain(ctx context.Context, b *bot.Bot, chatID int64) {
+	msg := bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      "Domain is already registered.\n\nنام دامنه قبلا ثبت شده است.",
+		ParseMode: ParseModeMarkdownV1,
+	}
+	if _, sendErr := b.SendMessage(ctx, &msg); nil != sendErr {
+		h.log.
+			Error().
+			Err(sendErr).
+			Dict("reply_message", zerolog.Dict().
+				Int64("chat_id", chatID),
+			).
+			Msg("failed to send duplicate domain reply message to user chat")
+		return
+	}
+}
+
+func (h *Handler) replyInternalError(ctx context.Context, b *bot.Bot, chatID int64) {
+	msg := bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      "Internal error occurred. Retry, and reach support if the problem persists.\n\nخطای داخلی رخ داده است. در صورتی که پس از تلاش مجدد مشکل برطرف نشد، به پشتیبانی پیام دهید.",
+		ParseMode: ParseModeMarkdownV1,
+	}
+	if _, sendErr := b.SendMessage(ctx, &msg); nil != sendErr {
+		h.log.
+			Error().
+			Err(sendErr).
+			Dict("reply_message", zerolog.Dict().
+				Int64("chat_id", chatID),
+			).
+			Msg("failed to send internal error reply message to user chat")
+		return
+	}
+}
+func (h *Handler) replyRateLimitExceeded(ctx context.Context, b *bot.Bot, chatID int64) {
+	msg := bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      "Rate limit exceeded. Retry in the next 24 hours.\n\nتعداد درخواست‌های شما بیشتر از حد مجاز هستند. می‌توانید مجددا بعد از ۲۴ ساعت تلاش کنید.",
+		ParseMode: ParseModeMarkdownV1,
+	}
+	if _, sendErr := b.SendMessage(ctx, &msg); nil != sendErr {
+		h.log.
+			Error().
+			Err(sendErr).
+			Dict("reply_message", zerolog.Dict().
+				Int64("chat_id", chatID),
+			).
+			Msg("failed to send rate limit exceeded reply message to user chat")
+		return
+	}
+}
+
+func (h *Handler) replyInvalidDomain(ctx context.Context, b *bot.Bot, chatID int64) {
+	msg := bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      "Invalid domain name. It should be a simple domain name like: `git.ir`.\n\nنام دامنه نامعتبر است. ورودی باید یک نام دامنه مثل `git.ir` باشد.",
+		ParseMode: ParseModeMarkdownV1,
+	}
+	if _, sendErr := b.SendMessage(ctx, &msg); nil != sendErr {
+		h.log.
+			Error().
+			Err(sendErr).
+			Dict("reply_message", zerolog.Dict().
+				Int64("chat_id", chatID),
+			).
+			Msg("failed to send invalid domain name reply message to user chat")
 		return
 	}
 }
