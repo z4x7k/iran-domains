@@ -205,7 +205,7 @@ func extractDomainApexZone(msg string) (string, error) {
 		return "", err
 	}
 
-	domain := parsedURL.Host
+	domain := parsedURL.Hostname()
 	if domain == "" {
 		path := parsedURL.Path
 		parts := strings.SplitN(path, "/", 2)
@@ -228,7 +228,7 @@ func extractDomainApexZone(msg string) (string, error) {
 	}
 	apex, tld := parts[partsCount-1], parts[partsCount]
 
-	return apex + "." + tld, nil
+	return strings.ToLower(apex + "." + tld), nil
 }
 
 func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.Update) {
